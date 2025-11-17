@@ -1,10 +1,14 @@
-# TagshotProV2.1formac_fixed.py - 图片标签重命名工具 (修复所有 pack/sticky 错误)
+# TagshotProV2.1formac_fixed_debug.py - 图片标签重命名工具 (修复布局并添加调试)
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, Toplevel
 import os
 from PIL import Image, ImageTk, ImageDraw
 import shutil
 import platform
+import sys
+
+# 打印执行开始信息
+print("--- Tagshot Pro V2 启动 ---")
 
 class ModernImageRenamerApp:
     def __init__(self):
@@ -57,8 +61,10 @@ class ModernImageRenamerApp:
             "组件": ["发动机", "传动轴", "轮毂", "车架"],
             "特写": ["划痕", "接口", "铭牌", "密封圈"]
         }
-
+        
+        print("初始化：开始创建 UI 组件")
         self._create_widgets()
+        print("初始化：UI 组件创建完成")
         self._set_default_tags()
 
     def _on_closing(self):
@@ -96,7 +102,6 @@ class ModernImageRenamerApp:
             
             btn_frame = ctk.CTkFrame(self.scrollable_tags_frame, fg_color="transparent")
             btn_frame.grid(row=row_counter, column=0, sticky="ew", padx=5)
-            # 确保按钮帧的列权重平均分配
             for i in range(len(tags)):
                 btn_frame.grid_columnconfigure(i, weight=1)
 
@@ -126,12 +131,12 @@ class ModernImageRenamerApp:
 
         # 压缩选项
         compression_check = ctk.CTkCheckBox(prefix_frame, text="启用压缩/优化", variable=self.compress_active)
-        # 修复：pack() 必须使用 anchor
+        # 布局修复：pack() 必须使用 anchor
         compression_check.pack(padx=10, pady=(10, 5), anchor="w") 
         
         ctk.CTkLabel(prefix_frame, text="JPG 质量 (50-100)").pack(padx=10, pady=(5, 0), anchor="w")
         compression_slider = ctk.CTkSlider(prefix_frame, from_=50, to=100, variable=self.compression_quality)
-        # 修复：pack() 必须使用 fill="x" 来扩展
+        # 布局修复：pack() 必须使用 fill="x" 来扩展
         compression_slider.pack(padx=10, pady=(0, 10), fill="x")
 
         # --- 底部操作按钮 ---
@@ -225,8 +230,7 @@ class ModernImageRenamerApp:
         draw = ImageDraw.Draw(image)
         try:
             from PIL import ImageFont
-            font = ctk.CTkFont(size=30, weight="bold").cget("font") # 尝试获取CustomTkinter字体对象
-            # 兼容性处理：如果无法直接获取 PIL font，使用默认
+            font = ctk.CTkFont(size=30, weight="bold").cget("font")
             if isinstance(font, str):
                 font = ImageFont.load_default()
             else:
@@ -256,13 +260,10 @@ class ModernImageRenamerApp:
             for filename in os.listdir(directory):
                 if filename.lower().endswith(supported_extensions):
                     path = os.path.join(directory, filename)
-                    # 初始化图片信息，包含原始文件名和当前标签
-                    # 尝试从文件名解析现有标签（例如：prefix-tag1-tag2.jpg）
                     base_name = os.path.splitext(filename)[0]
                     tags_part = base_name.split('-')
                     if len(tags_part) > 1:
-                        # 假设最后一个 '-' 之后是标签，但这部分逻辑在实际应用中需要更精确的解析器
-                        initial_tags = tags_part[-1] # 简单地取最后一部分
+                        initial_tags = tags_part[-1]
                     else:
                         initial_tags = "未命名"
                         
@@ -296,13 +297,16 @@ class ModernImageRenamerApp:
             self.current_tags.set(img_info['tags'])
             
             try:
-                # 确保在打开文件时关闭上一个文件的句柄
                 if hasattr(self, 'current_image_pil_handle'):
-                    self.current_image_pil_handle.close()
+                    # 尝试关闭上一个文件的句柄
+                    try:
+                        self.current_image_pil_handle.close()
+                    except:
+                        pass # 忽略关闭错误
 
                 self.current_image_pil_handle = Image.open(img_info['path'])
                 self.current_image_pil = self.current_image_pil_handle.copy()
-                self.current_image_pil_handle.close() # 立即关闭文件句柄，避免 Mac 文件锁
+                self.current_image_pil_handle.close() # 立即关闭文件句柄
                 self.resize_image_preview()
             except Exception as e:
                 self.status_var.set(f"错误：无法打开图片 {img_info['original_name']}: {e}")
@@ -329,20 +333,18 @@ class ModernImageRenamerApp:
 
         img_width, img_height = self.current_image_pil.size
         
-        # 计算缩放比例，并预留一些边距（如 20px）
         padding = 40
         ratio_w = (canvas_width - padding) / img_width
         ratio_h = (canvas_height - padding) / img_height
         ratio = min(ratio_w, ratio_h)
         
-        # 限制最大缩放比为 1.0 (不放大图片)
-        ratio = min(ratio, 1.0)
+        ratio = min(ratio, 1.0) # 不放大图片
         
         new_width = int(img_width * ratio)
         new_height = int(img_height * ratio)
 
-        # 调整尺寸
         try:
+            # 使用 Image.Resampling.LANCZOS
             resized_image = self.current_image_pil.resize((new_width, new_height), Image.Resampling.LANCZOS)
         except AttributeError:
              # 旧版本PIL兼容
@@ -350,7 +352,6 @@ class ModernImageRenamerApp:
 
         self.preview_canvas.image_tk = ImageTk.PhotoImage(resized_image)
         
-        # 居中显示
         center_x = canvas_width / 2
         center_y = canvas_height / 2
         
@@ -361,11 +362,9 @@ class ModernImageRenamerApp:
         """将标签添加到当前标签变量中"""
         current = self.current_tags.get().strip()
         
-        # 移除默认的“未命名”
         if current == "未命名":
             current = ""
         
-        # 确保标签之间以 '-' 分隔
         if current and not current.endswith('-') and not current.endswith('_'):
             current += '-'
             
@@ -454,7 +453,6 @@ class ModernImageRenamerApp:
                 temp_path = image_path + ".temp_comp"
                 
                 temp_img = img.copy()
-                # 强制使用 RGB 模式保存 JPEG
                 if temp_img.mode in ('RGBA', 'P'):
                     temp_img = temp_img.convert('RGB')
                     
@@ -462,13 +460,11 @@ class ModernImageRenamerApp:
                 temp_img.close()
                 img.close()
                 
-                # 覆盖原文件
                 shutil.move(temp_path, image_path)
                 
                 self.status_var.set(f"应用了 {quality}% JPEG 压缩。")
             
             elif original_ext == '.png':
-                # 针对 PNG 的简单优化 (例如：转换颜色模式以减少文件大小，但保持无损)
                  temp_path = image_path + ".temp_comp"
                  temp_img = img.copy()
                  if temp_img.mode == 'RGBA':
@@ -510,8 +506,7 @@ class ModernImageRenamerApp:
             temp_new_path = new_path_base
             while os.path.exists(temp_new_path) and temp_new_path != old_path:
                 name, ext = os.path.splitext(new_filename)
-                # 添加数字后缀，例如 filename-tag_1.jpg
-                temp_new_path = os.path.join(directory, f"{name.split('_')[0]}_{counter}{ext}") # 防止重复加数字
+                temp_new_path = os.path.join(directory, f"{name.split('_')[0]}_{counter}{ext}")
                 counter += 1
             
             # 重命名文件
@@ -535,14 +530,12 @@ class ModernImageRenamerApp:
             messagebox.showinfo("提示", "请先加载图片。")
             return
         
-        # 弹窗确认
         if not messagebox.askyesno("确认批量重命名", f"即将对 {len(self.image_list)} 张图片执行批量重命名。是否继续？\n\n注意：这会覆盖源文件并不可撤销。"):
             return
 
         errors = []
         success_count = 0
         
-        # 确保当前图片列表中的所有信息都是最新的
         self.update_preview_filename() 
         
         for i in range(len(self.image_list)):
@@ -586,7 +579,6 @@ class ModernImageRenamerApp:
         else:
             messagebox.showinfo("成功", f"批量重命名完成: {success_count} 张图片。")
             
-        # 批量操作后，刷新当前显示的图片信息（如果列表顺序没变，只需要更新 UI）
         if self.current_image_index != -1:
             self.display_current_image() 
 
@@ -616,5 +608,13 @@ class ModernImageRenamerApp:
         self.root.mainloop()
 
 if __name__ == "__main__":
-    app = ModernImageRenamerApp()
-    app.run()
+    try:
+        app = ModernImageRenamerApp()
+        print("启动：调用 app.run() 进入主循环")
+        app.run()
+        print("--- Tagshot Pro V2 正常退出 ---")
+    except Exception as e:
+        print("\nFATAL ERROR: 窗口启动失败！")
+        print(f"请检查以下错误信息：{e}")
+        # 在macOS上，如果依赖或环境配置有问题，有时需要强制退出
+        sys.exit(1)
