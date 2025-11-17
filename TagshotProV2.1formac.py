@@ -134,9 +134,9 @@ class ModernImageRenamerApp:
 
         # 压缩选项
         compression_check = ctk.CTkCheckBox(prefix_frame, text="启用压缩/优化", variable=self.compress_active)
-        compression_check.pack(padx=10, pady=(10, 5), sticky="w")
+        compression_check.pack(padx=10, pady=(10, 5), anchor="w")
         
-        ctk.CTkLabel(prefix_frame, text="JPG 质量 (0-100)").pack(padx=10, pady=(5, 0), sticky="w")
+        ctk.CTkLabel(prefix_frame, text="JPG 质量 (0-100)").pack(padx=10, pady=(5, 0), anchor="w")
         compression_slider = ctk.CTkSlider(prefix_frame, from_=50, to=100, variable=self.compression_quality)
         compression_slider.pack(padx=10, pady=(0, 10), sticky="ew")
 
@@ -553,4 +553,5 @@ class ModernImageRenamerApp:
 
 if __name__ == "__main__":
     app = ModernImageRenamerApp()
+
     app.run()
