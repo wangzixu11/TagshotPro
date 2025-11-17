@@ -1,14 +1,24 @@
-# TagshotProV2.1formac_fixed_debug.py - 图片标签重命名工具 (修复布局并添加调试)
+# image_renamer_enhanced.py
 import customtkinter as ctk
-from tkinter import filedialog, messagebox, Toplevel
+from tkinter import filedialog, messagebox
 import os
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageFilter, ImageTk, ImageDraw
 import shutil
-import platform
-import sys
 
-# 打印执行开始信息
-print("--- Tagshot Pro V2 启动 ---")
+# ========== macOS 兼容性修复 ==========
+import platform
+if platform.system() == "Darwin":  # macOS
+    # 修复自定义Tkinter在macOS上的显示问题
+    import tkinter as tk
+    # 设置TK缩放因子
+    import os
+    os.environ['TK_SILENCE_DEPRECATION'] = '1'
+    
+    # 修复High DPI显示
+    if hasattr(ctk, 'set_widget_scaling'):
+        ctk.set_widget_scaling(1.0)
+    if hasattr(ctk, 'set_window_scaling'):
+        ctk.set_window_scaling(1.0)
 
 class ModernImageRenamerApp:
     def __init__(self):
@@ -618,3 +628,4 @@ if __name__ == "__main__":
         print(f"请检查以下错误信息：{e}")
         # 在macOS上，如果依赖或环境配置有问题，有时需要强制退出
         sys.exit(1)
+
