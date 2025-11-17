@@ -44,4 +44,4 @@ GUI 框架: customtkinter (现代化 UI)
 
 ### 🔗下载与使用
 
-链接还未更新
+(https://pan.baidu.com/s/1T4arErKy7hcqfQe8xQAFcg?pwd=1010 )
