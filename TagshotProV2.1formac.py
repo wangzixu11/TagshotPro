@@ -77,6 +77,45 @@ class ModernImageRenamerApp:
         print("初始化：UI 组件创建完成")
         self._set_default_tags()
 
+        # 创建界面
+        self.create_widgets()
+    
+        # macOS 显示修复
+        self.macos_display_fix()
+
+    def macos_display_fix(self):
+        """macOS 显示修复"""
+        import platform
+        if platform.system() == "Darwin":
+            print("执行macOS显示修复...")
+            # 强制更新界面
+            self.root.update()
+            self.root.update_idletasks()
+            
+            # 延迟刷新
+            self.root.after(500, self.force_refresh)
+            
+            # 设置窗口在前台
+            self.root.lift()
+            self.root.attributes('-topmost', True)
+            self.root.after(1000, lambda: self.root.attributes('-topmost', False))
+
+    def force_refresh(self):
+        """强制刷新所有组件"""
+        print("强制刷新界面组件...")
+    try:
+        # 递归刷新所有子组件
+        def refresh_widgets(widget):
+            widget.update()
+            widget.update_idletasks()
+            for child in widget.winfo_children():
+                refresh_widgets(child)
+        
+        refresh_widgets(self.root)
+        print("界面刷新完成")
+    except Exception as e:
+        print(f"刷新过程中出错: {e}")
+
     def _on_closing(self):
         """窗口关闭时的处理"""
         self.root.destroy()
@@ -628,4 +667,5 @@ if __name__ == "__main__":
         print(f"请检查以下错误信息：{e}")
         # 在macOS上，如果依赖或环境配置有问题，有时需要强制退出
         sys.exit(1)
+
 
