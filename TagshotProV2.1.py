@@ -4,6 +4,7 @@ from tkinter import filedialog, messagebox
 import os
 from PIL import Image, ImageFilter, ImageTk, ImageDraw
 import shutil
+import json  # 新增导入
 
 class ModernImageRenamerApp:
     def __init__(self):
@@ -42,12 +43,8 @@ class ModernImageRenamerApp:
         self.max_size = 1800  # 最大尺寸
         self.compression_quality = 85  # 默认压缩质量
         
-        # 预设标签分类
-        self.categories = {
-            "外部视角": ["28_车顶", "2_正前方", "6_正后方", "29_右侧面", "4_左侧面", "3_右前45度", "7_右后45度", "1_左前45度", "5_左后45度"],
-            "内部视角": ["17_驾驶位", "11_方向盘", "10_中控台", "12_组合仪表", "14_音响及空调面板", "19_车内顶棚", "18_后排", "16_驾驶员座椅", "26_右侧前座椅", "27_右侧后座椅", "20_后备箱"],
-            "细节特写": ["15_变速杆", "21_发动机舱", "13_里程数特写", "9_钥匙", "8_右后大灯", "25_左前大灯", "24_左前轮胎轮毂", "22_右侧底大边", "23_左侧底大边", "30_车辆铭牌"]
-        }
+        # 预设标签分类 - 从JSON文件加载或使用默认值
+        self.categories = self.load_categories()
         
         # 存储标签按钮状态和已使用的标签
         self.tag_buttons = {}
@@ -55,7 +52,33 @@ class ModernImageRenamerApp:
         
         # 创建界面
         self.create_widgets()
+    
+    def load_categories(self):
+        """从JSON文件加载标签分类，如果文件不存在则使用默认值"""
+        try:
+            if os.path.exists("tags_config.json"):
+                with open("tags_config.json", "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"加载标签配置失败: {e}")
         
+        # 默认标签分类
+        return {
+            "外部视角": ["28_车顶", "2_正前方", "6_正后方", "29_右侧面", "4_左侧面", "3_右前45度", "7_右后45度", "1_左前45度", "5_左后45度"],
+            "内部视角": ["17_驾驶位", "11_方向盘", "10_中控台", "12_组合仪表", "14_音响及空调面板", "19_车内顶棚", "18_后排", "16_驾驶员座椅", "26_右侧前座椅", "27_右侧后座椅", "20_后备箱"],
+            "细节特写": ["15_变速杆", "21_发动机舱", "13_里程数特写", "9_钥匙", "8_右后大灯", "25_左前大灯", "24_左前轮胎轮毂", "22_右侧底大边", "23_左侧底大边", "30_车辆铭牌"]
+        }
+    
+    def save_categories(self):
+        """保存标签分类到JSON文件"""
+        try:
+            with open("tags_config.json", "w", encoding="utf-8") as f:
+                json.dump(self.categories, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            messagebox.showerror("错误", f"保存标签配置失败: {e}")
+            return False
+
     def create_widgets(self):
         # 创建主框架
         self.main_frame = ctk.CTkFrame(
@@ -233,6 +256,16 @@ class ModernImageRenamerApp:
         
         # 创建编辑界面
         self.create_editor_interface()
+        
+        # 确保窗口完全显示后再更新图片显示
+        self.editor_window.after(100, self.force_display_editor_image)
+
+    def force_display_editor_image(self):
+        """强制更新编辑器图片显示，确保Canvas尺寸正确"""
+        # 更新窗口以确保所有组件都已正确布局
+        self.editor_window.update_idletasks()
+        # 显示图片
+        self.display_editor_image()
     
     def create_editor_interface(self):
         """创建编辑界面"""
@@ -449,9 +482,16 @@ class ModernImageRenamerApp:
         canvas_width = self.canvas.winfo_width()
         canvas_height = self.canvas.winfo_height()
         
+        # 如果Canvas还没有正确尺寸，使用默认尺寸
         if canvas_width <= 1 or canvas_height <= 1:
-            # 如果Canvas还没有正确尺寸，使用默认尺寸
-            canvas_width, canvas_height = 600, 400
+            # 获取Canvas容器的尺寸作为参考
+            self.canvas_frame.update_idletasks()
+            canvas_width = self.canvas_frame.winfo_width() - 20  # 减去内边距
+            canvas_height = self.canvas_frame.winfo_height() - 20
+            
+            # 如果仍然没有有效尺寸，使用默认值
+            if canvas_width <= 1 or canvas_height <= 1:
+                canvas_width, canvas_height = 600, 400
         
         # 调整图片大小以适应Canvas
         img_width, img_height = self.editing_image.size
@@ -755,7 +795,6 @@ class ModernImageRenamerApp:
         except Exception as e:
             messagebox.showerror("错误", f"保存图片失败: {str(e)}")
 
-    # 以下为原有代码，保持不变...
     def build_left_panel(self):
         """构建主内容区域"""
         # 标题
@@ -897,6 +936,7 @@ class ModernImageRenamerApp:
         )
         self.status_bar.pack(fill="x", pady=5, padx=10)
         
+
     def build_right_panel(self):
         # 压缩设置区域
         self.build_compression_section()
@@ -907,6 +947,17 @@ class ModernImageRenamerApp:
             fg_color=self.colors["primary"]
         )
         header_frame.pack(fill="x", padx=10, pady=10)
+        
+        # 编辑标签按钮 - 新增功能
+        self.edit_tags_btn = ctk.CTkButton(
+            header_frame,
+            text="编辑标签",
+            command=self.open_edit_tags_window,
+            fg_color="#9B59B6",
+            hover_color="#8E44AD",
+            width=100
+        )
+        self.edit_tags_btn.pack(side="left", padx=(0, 5))
         
         # 重置按钮
         self.reset_tags_btn = ctk.CTkButton(
@@ -926,14 +977,25 @@ class ModernImageRenamerApp:
         )
         self.categories_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # 配置网格布局，使三个分类平均分布
-        self.categories_frame.columnconfigure(0, weight=1)
-        self.categories_frame.columnconfigure(1, weight=1)
-        self.categories_frame.columnconfigure(2, weight=1)
+        # 重新构建标签区域
+        self.rebuild_tags_area()
+    
+    def rebuild_tags_area(self):
+        """重新构建标签区域（用于刷新标签显示）"""
+        # 清除现有标签区域内容
+        for widget in self.categories_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置网格布局，使分类平均分布
+        num_categories = len(self.categories)
+        for i in range(num_categories):
+            self.categories_frame.columnconfigure(i, weight=1, minsize=160)
         self.categories_frame.rowconfigure(0, weight=1)
         
         # 为每个分类创建框架
         self.category_frames = {}
+        self.tag_buttons = {}  # 清空标签按钮字典
+        
         for i, (category, tags) in enumerate(self.categories.items()):
             # 创建分类容器
             category_container = ctk.CTkFrame(
@@ -942,6 +1004,7 @@ class ModernImageRenamerApp:
                 corner_radius=8
             )
             category_container.grid(row=0, column=i, sticky="nsew", padx=5, pady=5)
+            category_container.grid_propagate(False)  # 禁止自动调整大小
             
             # 分类标题
             category_label = ctk.CTkLabel(
@@ -952,7 +1015,7 @@ class ModernImageRenamerApp:
             )
             category_label.pack(pady=5)
             
-            # 创建普通框架用于标签按钮（不再使用滚动框架）
+            # 创建普通框架用于标签按钮
             tag_frame = ctk.CTkFrame(
                 category_container,
                 fg_color=self.colors["secondary"]
@@ -975,7 +1038,354 @@ class ModernImageRenamerApp:
                 
                 # 存储按钮引用以便后续管理状态
                 self.tag_buttons[tag] = btn
+        
+        # 更新标签按钮状态
+        self.update_tag_buttons_state()
     
+    def open_edit_tags_window(self):
+        """打开编辑标签窗口"""
+        self.edit_tags_window = ctk.CTkToplevel(self.root)
+        self.edit_tags_window.title("编辑标签")
+        self.edit_tags_window.geometry("800x600")
+        self.edit_tags_window.configure(fg_color=self.colors["primary"])
+        self.edit_tags_window.transient(self.root)
+        self.edit_tags_window.grab_set()
+        
+        # 创建编辑界面
+        self.create_edit_tags_interface()
+    
+    def create_edit_tags_interface(self):
+        """创建编辑标签界面"""
+        # 主容器
+        main_container = ctk.CTkFrame(
+            self.edit_tags_window,
+            fg_color=self.colors["primary"]
+        )
+        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # 标题
+        title_label = ctk.CTkLabel(
+            main_container,
+            text="编辑标签分类",
+            font=ctk.CTkFont(size=18, weight="bold"),
+            text_color=self.colors["text_primary"]
+        )
+        title_label.pack(pady=(0, 10))
+        
+        # 说明文字
+        instruction_label = ctk.CTkLabel(
+            main_container,
+            text="您可以添加、删除分类和标签。每个标签应该以'序号_描述'的格式（如：'1_正前方'）",
+            font=ctk.CTkFont(size=12),
+            text_color=self.colors["text_secondary"],
+            wraplength=700
+        )
+        instruction_label.pack(pady=(0, 10))
+        
+        # 内容区域
+        content_frame = ctk.CTkFrame(
+            main_container,
+            fg_color=self.colors["primary"]
+        )
+        content_frame.pack(fill="both", expand=True)
+        
+        # 左侧分类列表
+        left_frame = ctk.CTkFrame(
+            content_frame,
+            fg_color=self.colors["secondary"],
+            width=200
+        )
+        left_frame.pack(side="left", fill="y", padx=(0, 5))
+        left_frame.pack_propagate(False)
+        
+        # 分类列表标题
+        categories_title = ctk.CTkLabel(
+            left_frame,
+            text="分类列表",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=self.colors["text_primary"]
+        )
+        categories_title.pack(pady=10)
+        
+        # 分类列表框架
+        categories_list_frame = ctk.CTkFrame(
+            left_frame,
+            fg_color=self.colors["secondary"]
+        )
+        categories_list_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        # 分类列表（使用文本框显示）
+        self.categories_listbox = ctk.CTkTextbox(
+            categories_list_frame,
+            height=150,
+            fg_color=self.colors["primary"],
+            text_color=self.colors["text_primary"]
+        )
+        self.categories_listbox.pack(fill="both", expand=True)
+        
+        # 更新分类列表显示
+        self.update_categories_listbox()
+        
+        # 分类操作按钮
+        category_buttons_frame = ctk.CTkFrame(
+            left_frame,
+            fg_color=self.colors["secondary"]
+        )
+        category_buttons_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.add_category_btn = ctk.CTkButton(
+            category_buttons_frame,
+            text="添加分类",
+            command=self.add_category,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"]
+        )
+        self.add_category_btn.pack(fill="x", pady=2)
+        
+        self.rename_category_btn = ctk.CTkButton(
+            category_buttons_frame,
+            text="重命名分类",
+            command=self.rename_category,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"]
+        )
+        self.rename_category_btn.pack(fill="x", pady=2)
+        
+        self.delete_category_btn = ctk.CTkButton(
+            category_buttons_frame,
+            text="删除分类",
+            command=self.delete_category,
+            fg_color=self.colors["danger"],
+            hover_color=self.colors["danger_hover"]
+        )
+        self.delete_category_btn.pack(fill="x", pady=2)
+        
+        # 右侧标签编辑区域
+        right_frame = ctk.CTkFrame(
+            content_frame,
+            fg_color=self.colors["secondary"]
+        )
+        right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
+        
+        # 当前分类标题
+        self.current_category_label = ctk.CTkLabel(
+            right_frame,
+            text="当前分类: 未选择",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            text_color=self.colors["text_primary"]
+        )
+        self.current_category_label.pack(pady=10)
+        
+        # 标签编辑区域
+        tags_edit_frame = ctk.CTkFrame(
+            right_frame,
+            fg_color=self.colors["secondary"]
+        )
+        tags_edit_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        # 标签编辑说明
+        tags_instruction = ctk.CTkLabel(
+            tags_edit_frame,
+            text="每行一个标签，格式：序号_描述（例如：1_正前方）",
+            font=ctk.CTkFont(size=12),
+            text_color=self.colors["text_secondary"]
+        )
+        tags_instruction.pack(anchor="w", pady=(10, 5))
+        
+        # 标签编辑文本框
+        self.tags_textbox = ctk.CTkTextbox(
+            tags_edit_frame,
+            fg_color=self.colors["primary"],
+            text_color=self.colors["text_primary"]
+        )
+        self.tags_textbox.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        # 标签操作按钮
+        tag_buttons_frame = ctk.CTkFrame(
+            right_frame,
+            fg_color=self.colors["secondary"]
+        )
+        tag_buttons_frame.pack(fill="x", padx=10, pady=10)
+        
+        self.save_tags_btn = ctk.CTkButton(
+            tag_buttons_frame,
+            text="保存标签",
+            command=self.save_current_tags,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"]
+        )
+        self.save_tags_btn.pack(fill="x", pady=2)
+        
+        self.add_tag_btn = ctk.CTkButton(
+            tag_buttons_frame,
+            text="添加示例标签",
+            command=self.add_sample_tags,
+            fg_color=self.colors["accent"],
+            hover_color=self.colors["accent_hover"]
+        )
+        self.add_tag_btn.pack(fill="x", pady=2)
+        
+        # 底部按钮
+        bottom_buttons_frame = ctk.CTkFrame(
+            main_container,
+            fg_color=self.colors["primary"]
+        )
+        bottom_buttons_frame.pack(fill="x", pady=10)
+        
+        self.save_all_btn = ctk.CTkButton(
+            bottom_buttons_frame,
+            text="保存所有更改",
+            command=self.save_all_changes,
+            fg_color=self.colors["success"],
+            hover_color=self.colors["success_hover"],
+            height=40
+        )
+        self.save_all_btn.pack(side="left", padx=(0, 5), fill="x", expand=True)
+        
+        self.cancel_edit_btn = ctk.CTkButton(
+            bottom_buttons_frame,
+            text="取消",
+            command=self.edit_tags_window.destroy,
+            fg_color=self.colors["secondary"],
+            hover_color=self.colors["primary"],
+            height=40
+        )
+        self.cancel_edit_btn.pack(side="right", padx=(5, 0), fill="x", expand=True)
+        
+        # 绑定分类选择事件
+        self.categories_listbox.bind("<ButtonRelease-1>", self.on_category_select)
+    
+    def update_categories_listbox(self):
+        """更新分类列表显示"""
+        self.categories_listbox.delete("1.0", "end")
+        for category in self.categories.keys():
+            self.categories_listbox.insert("end", f"{category}\n")
+    
+    def on_category_select(self, event):
+        """当选择分类时的事件处理"""
+        # 获取点击位置
+        index = self.categories_listbox.index(f"@{event.x},{event.y}")
+        line_start = index.split(".")[0] + ".0"
+        line_end = index.split(".")[0] + ".end"
+        
+        # 获取选中的分类名称
+        selected_category = self.categories_listbox.get(line_start, line_end).strip()
+        
+        if selected_category and selected_category in self.categories:
+            self.selected_category = selected_category
+            self.current_category_label.configure(text=f"当前分类: {selected_category}")
+            
+            # 显示该分类的标签
+            tags = self.categories[selected_category]
+            self.tags_textbox.delete("1.0", "end")
+            self.tags_textbox.insert("1.0", "\n".join(tags))
+    
+    def add_category(self):
+        """添加新分类"""
+        dialog = ctk.CTkInputDialog(text="请输入新分类名称:", title="添加分类")
+        new_category = dialog.get_input()
+        
+        if new_category and new_category.strip():
+            new_category = new_category.strip()
+            if new_category not in self.categories:
+                self.categories[new_category] = []
+                self.update_categories_listbox()
+                messagebox.showinfo("成功", f"已添加分类: {new_category}")
+            else:
+                messagebox.showwarning("警告", "分类已存在！")
+    
+    def rename_category(self):
+        """重命名分类"""
+        if not hasattr(self, 'selected_category') or not self.selected_category:
+            messagebox.showwarning("警告", "请先选择一个分类！")
+            return
+        
+        dialog = ctk.CTkInputDialog(text="请输入新的分类名称:", title="重命名分类")
+        new_name = dialog.get_input()
+        
+        if new_name and new_name.strip():
+            new_name = new_name.strip()
+            if new_name not in self.categories:
+                # 重命名分类
+                self.categories[new_name] = self.categories.pop(self.selected_category)
+                self.selected_category = new_name
+                self.update_categories_listbox()
+                self.current_category_label.configure(text=f"当前分类: {new_name}")
+                messagebox.showinfo("成功", f"已重命名分类为: {new_name}")
+            else:
+                messagebox.showwarning("警告", "分类名称已存在！")
+    
+    def delete_category(self):
+        """删除分类"""
+        if not hasattr(self, 'selected_category') or not self.selected_category:
+            messagebox.showwarning("警告", "请先选择一个分类！")
+            return
+        
+        result = messagebox.askyesno("确认删除", f"确定要删除分类 '{self.selected_category}' 吗？")
+        if result:
+            del self.categories[self.selected_category]
+            self.selected_category = None
+            self.update_categories_listbox()
+            self.current_category_label.configure(text="当前分类: 未选择")
+            self.tags_textbox.delete("1.0", "end")
+            messagebox.showinfo("成功", "分类已删除")
+    
+    def save_current_tags(self):
+        """保存当前分类的标签"""
+        if not hasattr(self, 'selected_category') or not self.selected_category:
+            messagebox.showwarning("警告", "请先选择一个分类！")
+            return
+        
+        tags_text = self.tags_textbox.get("1.0", "end-1c")
+        tags = [tag.strip() for tag in tags_text.split("\n") if tag.strip()]
+        
+        # 验证标签格式（可选，但建议）
+        valid_tags = []
+        for tag in tags:
+            if "_" in tag:
+                valid_tags.append(tag)
+            else:
+                # 如果没有下划线，可以自动添加默认序号或者提示用户
+                if messagebox.askyesno("格式提示", f"标签 '{tag}' 没有使用'序号_描述'格式。是否自动添加序号？"):
+                    valid_tags.append(f"{len(valid_tags)+1}_{tag}")
+                else:
+                    valid_tags.append(tag)
+        
+        self.categories[self.selected_category] = valid_tags
+        messagebox.showinfo("成功", f"已保存 {len(valid_tags)} 个标签到分类 '{self.selected_category}'")
+    
+    def add_sample_tags(self):
+        """添加示例标签到当前分类"""
+        if not hasattr(self, 'selected_category') or not self.selected_category:
+            messagebox.showwarning("警告", "请先选择一个分类！")
+            return
+        
+        sample_tags = ["1_示例标签1", "2_示例标签2", "3_示例标签3"]
+        current_text = self.tags_textbox.get("1.0", "end-1c")
+        if current_text.strip():
+            new_text = current_text + "\n" + "\n".join(sample_tags)
+        else:
+            new_text = "\n".join(sample_tags)
+        
+        self.tags_textbox.delete("1.0", "end")
+        self.tags_textbox.insert("1.0", new_text)
+        messagebox.showinfo("提示", "已添加示例标签，请根据需要修改")
+    
+    def save_all_changes(self):
+        """保存所有更改"""
+        # 保存当前正在编辑的标签（如果有）
+        if hasattr(self, 'selected_category') and self.selected_category:
+            self.save_current_tags()
+        
+        # 保存到JSON文件
+        if self.save_categories():
+            # 重新构建标签区域
+            self.rebuild_tags_area()
+            messagebox.showinfo("成功", "所有更改已保存并生效！")
+            self.edit_tags_window.destroy()
+        else:
+            messagebox.showerror("错误", "保存失败，请检查文件权限")
+
     def build_compression_section(self):
         """构建压缩设置区域"""
         # 压缩设置框架
@@ -1042,11 +1452,20 @@ class ModernImageRenamerApp:
         # 压缩信息
         self.compression_info = ctk.CTkLabel(
             self.compression_frame,
-            text=f"图片将被压缩到最大 {self.max_size}×{self.max_size} 像素",
+            text=f"图片将被压缩到最大 {self.max_size}×{self.max_size} 像素，并优化文件大小",
             font=ctk.CTkFont(size=12),
             text_color=self.colors["text_secondary"]
         )
         self.compression_info.pack(anchor="w", pady=(0, 5), padx=10)
+        
+        # 压缩建议
+        self.compression_tips = ctk.CTkLabel(
+            self.compression_frame,
+            text="建议设置: 高质量(85-100%) | 平衡(70-85%) | 高压缩(50-70%)",
+            font=ctk.CTkFont(size=11),
+            text_color=self.colors["text_secondary"]
+        )
+        self.compression_tips.pack(anchor="w", pady=(0, 10), padx=10)
         
         # 压缩按钮
         self.compress_btn = ctk.CTkButton(
@@ -1063,12 +1482,58 @@ class ModernImageRenamerApp:
         self.compression_quality = quality
         self.quality_value.configure(text=f"{quality}%")
     
+    def format_file_size(self, size_bytes):
+        """格式化文件大小显示"""
+        if size_bytes == 0:
+            return "0B"
+        
+        size_names = ["B", "KB", "MB", "GB"]
+        i = 0
+        while size_bytes >= 1024 and i < len(size_names) - 1:
+            size_bytes /= 1024.0
+            i += 1
+        
+        return f"{size_bytes:.1f}{size_names[i]}"
+    
+    def convert_png_to_jpg(self, png_path):
+        """将PNG图片转换为JPG格式"""
+        try:
+            # 打开PNG图片
+            with Image.open(png_path) as img:
+                # 如果图片有透明通道，转换为RGB并填充白色背景
+                if img.mode in ('RGBA', 'LA'):
+                    # 创建白色背景
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    # 如果图片是RGBA模式，使用alpha通道作为mask
+                    if img.mode == 'RGBA':
+                        background.paste(img, mask=img.split()[-1])
+                    else:
+                        background.paste(img)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # 生成新的JPG文件路径
+                jpg_path = os.path.splitext(png_path)[0] + '.jpg'
+                
+                # 保存为JPG格式
+                img.save(jpg_path, 'JPEG', quality=self.compression_quality, optimize=True)
+                
+                # 删除原PNG文件
+                os.remove(png_path)
+                
+                return True, jpg_path
+                
+        except Exception as e:
+            return False, str(e)
+    
     def compress_image(self, image_path):
-        """压缩单张图片"""
+        """压缩单张图片 - 同时调整尺寸和文件大小"""
         try:
             with Image.open(image_path) as img:
                 # 获取原图格式
                 original_format = img.format
+                original_size = os.path.getsize(image_path)  # 获取原文件大小
                 
                 # 计算新的尺寸，保持宽高比
                 width, height = img.size
@@ -1080,15 +1545,20 @@ class ModernImageRenamerApp:
                 
                 # 保存压缩后的图片（覆盖原文件）
                 if original_format in ['JPEG', 'JPG']:
+                    # 对于JPEG，使用质量参数控制压缩
                     img.save(image_path, quality=self.compression_quality, optimize=True)
-                elif original_format == 'PNG':
-                    # PNG格式使用优化
+                elif original_format == 'GIF':
+                    # 对于GIF，使用优化
                     img.save(image_path, optimize=True)
                 else:
                     # 其他格式直接保存
                     img.save(image_path)
                 
-                return True, f"压缩成功: {os.path.basename(image_path)}"
+                # 计算压缩后的文件大小
+                compressed_size = os.path.getsize(image_path)
+                compression_ratio = (1 - compressed_size / original_size) * 100
+                
+                return True, f"压缩成功: {os.path.basename(image_path)} (原:{self.format_file_size(original_size)} → 现:{self.format_file_size(compressed_size)}, 压缩率:{compression_ratio:.1f}%)"
                 
         except Exception as e:
             return False, f"压缩失败 {os.path.basename(image_path)}: {str(e)}"
@@ -1114,23 +1584,46 @@ class ModernImageRenamerApp:
         # 执行压缩
         success_count = 0
         errors = []
+        total_original_size = 0
+        total_compressed_size = 0
         
         for img_info in self.images:
+            # 获取原文件大小
+            original_size = os.path.getsize(img_info["path"])
+            total_original_size += original_size
+            
             success, message = self.compress_image(img_info["path"])
             if success:
                 success_count += 1
+                # 获取压缩后文件大小
+                compressed_size = os.path.getsize(img_info["path"])
+                total_compressed_size += compressed_size
             else:
                 errors.append(message)
         
-        # 显示结果
-        if errors:
-            messagebox.showwarning("压缩完成", 
-                f"成功压缩 {success_count} 张图片\n"
-                f"失败 {len(errors)} 张:\n" + "\n".join(errors))
+        # 计算总体压缩率
+        if total_original_size > 0:
+            total_compression_ratio = (1 - total_compressed_size / total_original_size) * 100
+            size_saved = total_original_size - total_compressed_size
         else:
-            messagebox.showinfo("成功", f"成功压缩所有 {success_count} 张图片")
+            total_compression_ratio = 0
+            size_saved = 0
         
-        self.status_var.set(f"图片压缩完成: {success_count} 成功, {len(errors)} 失败")
+        # 显示结果
+        result_message = f"压缩完成！\n成功: {success_count} 张, 失败: {len(errors)} 张\n\n"
+        result_message += f"总体压缩效果:\n"
+        result_message += f"原大小: {self.format_file_size(total_original_size)}\n"
+        result_message += f"现大小: {self.format_file_size(total_compressed_size)}\n"
+        result_message += f"节省空间: {self.format_file_size(size_saved)}\n"
+        result_message += f"压缩率: {total_compression_ratio:.1f}%"
+        
+        if errors:
+            result_message += f"\n\n失败的图片:\n" + "\n".join(errors)
+            messagebox.showwarning("压缩完成", result_message)
+        else:
+            messagebox.showinfo("成功", result_message)
+        
+        self.status_var.set(f"图片压缩完成: {success_count} 成功, {len(errors)} 失败, 节省空间: {self.format_file_size(size_saved)}")
         
         # 刷新当前图片显示
         if self.images:
@@ -1151,21 +1644,62 @@ class ModernImageRenamerApp:
         if filenames:
             self.add_images(filenames)
     
-    def update_common_prefix(self, event=None):
-        """更新统一前缀"""
-        self.common_prefix = self.prefix_entry.get()
-        # 更新图片列表显示，显示带前缀的文件名
-        self.update_image_list()
-    
-    def clear_prefix(self):
-        """清除统一前缀"""
-        self.prefix_entry.delete(0, 'end')
-        self.common_prefix = ""
-        self.update_image_list()
-        self.status_var.set("已清除统一前缀")
-    
     def add_images(self, file_paths):
         """添加图片到应用"""
+        # 检测是否有PNG文件
+        png_files = [path for path in file_paths if path.lower().endswith('.png')]
+        
+        # 如果有PNG文件，询问用户是否转换为JPG
+        if png_files:
+            png_count = len(png_files)
+            result = messagebox.askyesno(
+                "检测到PNG文件", 
+                f"检测到 {png_count} 个PNG文件。\n\n"
+                f"PNG文件压缩效果有限，建议转换为JPG格式以获得更好的压缩效果。\n\n"
+                f"是否将所有PNG文件转换为JPG格式？\n\n"
+                f"注意：转换后将删除原PNG文件，使用白色背景替换透明区域。"
+            )
+            
+            if result:
+                # 转换PNG文件为JPG
+                converted_files = []
+                failed_conversions = []
+                
+                for png_path in png_files:
+                    success, result = self.convert_png_to_jpg(png_path)
+                    if success:
+                        converted_files.append((png_path, result))
+                    else:
+                        failed_conversions.append(f"{os.path.basename(png_path)}: {result}")
+                
+                # 更新文件路径列表，将PNG路径替换为JPG路径
+                new_file_paths = []
+                for path in file_paths:
+                    if path in png_files:
+                        # 查找对应的转换后的JPG路径
+                        for original, converted in converted_files:
+                            if original == path:
+                                new_file_paths.append(converted)
+                                break
+                    else:
+                        new_file_paths.append(path)
+                
+                file_paths = new_file_paths
+                
+                # 显示转换结果
+                if failed_conversions:
+                    messagebox.showwarning(
+                        "部分PNG转换失败",
+                        f"成功转换 {len(converted_files)} 个PNG文件，失败 {len(failed_conversions)} 个:\n" +
+                        "\n".join(failed_conversions)
+                    )
+                else:
+                    messagebox.showinfo(
+                        "PNG转换完成",
+                        f"成功将所有 {len(converted_files)} 个PNG文件转换为JPG格式。"
+                    )
+        
+        # 添加图片到应用
         for file_path in file_paths:
             # 获取文件名和扩展名
             name, ext = os.path.splitext(os.path.basename(file_path))
@@ -1182,6 +1716,19 @@ class ModernImageRenamerApp:
             self.display_current_image()
             
         self.status_var.set(f"成功添加 {len(file_paths)} 张图片")
+    
+    def update_common_prefix(self, event=None):
+        """更新统一前缀"""
+        self.common_prefix = self.prefix_entry.get()
+        # 更新图片列表显示，显示带前缀的文件名
+        self.update_image_list()
+    
+    def clear_prefix(self):
+        """清除统一前缀"""
+        self.prefix_entry.delete(0, 'end')
+        self.common_prefix = ""
+        self.update_image_list()
+        self.status_var.set("已清除统一前缀")
     
     def clear_all_images(self):
         """清除所有图片"""
@@ -1202,6 +1749,9 @@ class ModernImageRenamerApp:
     
     def reset_tag_states(self):
         """重置所有标签按钮状态"""
+        # 暂时禁用布局更新
+        self.categories_frame.update_idletasks()
+        
         self.used_tags.clear()
         for tag, button in self.tag_buttons.items():
             button.configure(
@@ -1209,8 +1759,12 @@ class ModernImageRenamerApp:
                 fg_color=self.colors["accent"],
                 hover_color=self.colors["accent_hover"]
             )
+        
         # 更新当前图片的标签按钮状态
         self.update_tag_buttons_state()
+        
+        # 强制更新布局
+        self.categories_frame.update()
         self.status_var.set("已重置所有标签状态")
     
     def update_image_list(self):
@@ -1268,6 +1822,9 @@ class ModernImageRenamerApp:
     
     def update_tag_buttons_state(self):
         """更新标签按钮状态"""
+        # 暂时禁用布局更新
+        self.categories_frame.update_idletasks()
+        
         # 更新已使用标签的状态
         for tag, button in self.tag_buttons.items():
             if tag in self.used_tags:
@@ -1294,6 +1851,9 @@ class ModernImageRenamerApp:
                     state="disabled"
                 )
     
+        # 强制更新布局
+        self.categories_frame.update()
+    
     def update_tag(self, event):
         """更新标签"""
         if self.images:
@@ -1311,6 +1871,9 @@ class ModernImageRenamerApp:
     def apply_tag(self, tag):
         """应用预设标签到当前图片"""
         if self.images:
+            # 暂时禁用布局更新
+            self.categories_frame.update_idletasks()
+            
             # 将标签添加到已使用集合
             self.used_tags.add(tag)
             
@@ -1323,6 +1886,9 @@ class ModernImageRenamerApp:
             
             # 更新标签按钮状态
             self.update_tag_buttons_state()
+            
+            # 强制更新布局
+            self.categories_frame.update()
             
             # 自动切换到下一张图片（如果不是最后一张）
             if self.current_index < len(self.images) - 1:
