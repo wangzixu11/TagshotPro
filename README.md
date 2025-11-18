@@ -126,3 +126,10 @@ GUI 框架: customtkinter (现代化 UI)
 | **找不到命令** | `python is not recognized as an internal or external command` | **确保**在安装 Python 时勾选了 `Add python.exe to PATH`，或手动将其添加到系统环境变量中。 |
 | **缺少库** | `ModuleNotFoundError: No module named 'customtkinter'` | 回到步骤二，重新运行 `pip install customtkinter Pillow` 命令，确保您的命令行使用的 Python 环境是正确的。 |
 | **权限问题** | `Permission denied: 'TagshotProV2.py'` | 尝试使用 `python3 TagshotProV2.py`，或确保您的用户账户有权执行该文件。 |
+
+---
+
+# 更新日志
+
+V2.1 更新了图片选取编辑功能，现在可以通过四个点选择需要添加高斯模糊的区域
+     修复了PNG图片无法压缩的问题，现在上传图片进入软件的时候，会先检测是否有除了jpg以外的格式，如果有则询问是否先转换为jpg格式。
