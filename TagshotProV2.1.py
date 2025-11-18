@@ -52,6 +52,9 @@ class ModernImageRenamerApp:
         
         # 创建界面
         self.create_widgets()
+
+        # 添加统一的圆角设置
+        # self.corner_radius = 30  # 设置统一的圆角值
     
     def load_categories(self):
         """从JSON文件加载标签分类，如果文件不存在则使用默认值"""
