@@ -4,7 +4,9 @@
 同时也提供了网盘下载地址方便直接下载使用。
 
 ### 🔗下载与使用
-(https://pan.baidu.com/s/1T4arErKy7hcqfQe8xQAFcg?pwd=1010 )
+(TagshotProV2.1.exe
+
+链接: https://pan.baidu.com/s/1xXoifODF3tcyhQT-vOR9LQ?pwd=1010 提取码: 1010 )
 
 ---
 
