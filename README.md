@@ -1,5 +1,7 @@
 # TagshotPro
 智能批量图片标签与重命名工具。 基于 Python/CustomTkinter 构建的跨平台桌面应用，通过结构化标签和实时预览，将图片归档命名效率提升 80%。支持内置压缩。
+源码已经开放在仓库，第一次用github，有做得不好的欢迎提建议。
+同时也提供了网盘下载地址方便直接下载使用。
 
 ### 🔗下载与使用
 (https://pan.baidu.com/s/1T4arErKy7hcqfQe8xQAFcg?pwd=1010 )
